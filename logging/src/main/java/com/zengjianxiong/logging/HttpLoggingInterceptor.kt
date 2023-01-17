@@ -1,7 +1,7 @@
 package com.zengjianxiong.logging;
 
 
-import com.zengjianxiong.library.logging.internal.isProbablyUtf8
+import com.zengjianxiong.logging.internal.isProbablyUtf8
 import java.io.IOException
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets.UTF_8
