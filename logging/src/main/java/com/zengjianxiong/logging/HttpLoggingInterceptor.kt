@@ -26,9 +26,20 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
     @Volatile
     var level = Level.NONE
 
-    @set:JvmName("urls")
+    @set:JvmName("filterUrls")
     @Volatile
     var filterUrls = emptyArray<String>()
+
+    @set:JvmName("retainLogHeaders")
+    @Volatile
+    var retainLogHeaders = emptyArray<String>()
+
+    /**
+     * true 开启隐藏header false 关闭隐藏header
+     */
+    @set:JvmName("hiddenHeadToggle")
+    @Volatile
+    var hiddenHeadToggle = false
 
     enum class Level {
         /** No logs. */
@@ -127,6 +138,12 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
         this.filterUrls = urls
     }
 
+    fun setRetainLogHeaders(hiddenHeadToggle: Boolean = false, retainLogHeaders: Array<String>) =
+        apply {
+            this.retainLogHeaders = retainLogHeaders
+            this.hiddenHeadToggle = hiddenHeadToggle
+        }
+
 
     @JvmName("-deprecated_level")
     @Deprecated(
@@ -144,6 +161,16 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
         val request = chain.request()
         if (level == Level.NONE) {
             return chain.proceed(request)
+        }
+        val path = request.url.toUrl().path
+
+        if (filterUrls.isNotEmpty()) {
+            val v = filterUrls.firstOrNull {
+                path.contains(it)
+            }
+            if (v != null) {
+                return chain.proceed(request)
+            }
         }
 
         val logBody = level == Level.BODY
@@ -178,7 +205,7 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
             }
 
             for (i in 0 until headers.size) {
-                logHeader(headers, i)
+                logHeader(headers, i, path)
             }
 
             if (!logBody || requestBody == null) {
@@ -202,7 +229,8 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
                     logger.log("--> END ${request.method} (${requestBody.contentLength()}-byte body)")
                 } else {
                     logger.log(
-                        "--> END ${request.method} (binary ${requestBody.contentLength()}-byte body omitted)")
+                        "--> END ${request.method} (binary ${requestBody.contentLength()}-byte body omitted)"
+                    )
                 }
             }
         }
@@ -222,12 +250,13 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
         val contentLength = responseBody.contentLength()
         val bodySize = if (contentLength != -1L) "$contentLength-byte" else "unknown-length"
         logger.log(
-            "<-- ${response.code}${if (response.message.isEmpty()) "" else ' ' + response.message} ${response.request.url} (${tookMs}ms${if (!logHeaders) ", $bodySize body" else ""})")
+            "<-- ${response.code}${if (response.message.isEmpty()) "" else ' ' + response.message} ${response.request.url} (${tookMs}ms${if (!logHeaders) ", $bodySize body" else ""})"
+        )
 
         if (logHeaders) {
             val headers = response.headers
             for (i in 0 until headers.size) {
-                logHeader(headers, i)
+                logHeader(headers, i, path)
             }
 
             if (!logBody || !response.promisesBody()) {
@@ -273,9 +302,18 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
         return response
     }
 
-    private fun logHeader(headers: Headers, i: Int) {
+    private fun logHeader(headers: Headers, i: Int, path: String) {
         val value = if (headers.name(i) in headersToRedact) "██" else headers.value(i)
-        logger.log(headers.name(i) + ": " + value)
+        val header = headers.name(i)
+        if (hiddenHeadToggle) {
+            retainLogHeaders.forEach {
+                if (path.contains(it)) {
+                    logger.log("$header: $value")
+                }
+            }
+        } else {
+            logger.log("$header: $value")
+        }
     }
 
     private fun bodyHasUnknownEncoding(headers: Headers): Boolean {
