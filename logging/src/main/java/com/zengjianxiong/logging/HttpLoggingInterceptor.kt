@@ -1,4 +1,4 @@
-package com.zengjianxiong.logging;
+package com.zengjianxiong.logging
 
 
 import com.zengjianxiong.logging.internal.isProbablyUtf8
@@ -33,13 +33,6 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
     @set:JvmName("retainLogHeaders")
     @Volatile
     var retainLogHeaders = emptyArray<String>()
-
-    /**
-     * true 开启隐藏header false 关闭隐藏header
-     */
-    @set:JvmName("hiddenHeadToggle")
-    @Volatile
-    var hiddenHeadToggle = false
 
     enum class Level {
         /** No logs. */
@@ -138,11 +131,9 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
         this.filterUrls = urls
     }
 
-    fun setRetainLogHeaders(hiddenHeadToggle: Boolean = false, retainLogHeaders: Array<String>) =
-        apply {
-            this.retainLogHeaders = retainLogHeaders
-            this.hiddenHeadToggle = hiddenHeadToggle
-        }
+    fun setRetainLogHeaders(retainLogHeaders: Array<String>) = apply {
+        this.retainLogHeaders = retainLogHeaders
+    }
 
 
     @JvmName("-deprecated_level")
@@ -305,14 +296,10 @@ class HttpLoggingInterceptor @JvmOverloads constructor(
     private fun logHeader(headers: Headers, i: Int, path: String) {
         val value = if (headers.name(i) in headersToRedact) "██" else headers.value(i)
         val header = headers.name(i)
-        if (hiddenHeadToggle) {
-            retainLogHeaders.forEach {
-                if (path.contains(it)) {
-                    logger.log("$header: $value")
-                }
+        retainLogHeaders.forEach {
+            if(path.contains(it)){
+                logger.log("$header: $value")
             }
-        } else {
-            logger.log("$header: $value")
         }
     }
 
